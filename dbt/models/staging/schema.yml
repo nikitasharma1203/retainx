@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: stg_transactions
+    description: Raw invoice lines, typed and renamed. Nothing removed; flags show what later gets excluded.
+    columns:
+      - name: invoice_id
+        description: Invoice number. Starts with C for cancellations.
+        tests: [not_null]
+      - name: is_cancellation
+        description: True when the invoice number starts with C.
+        tests: [not_null]
+      - name: is_missing_customer
+        description: True when the line has no customer identifier.
+        tests: [not_null]
+  - name: stg_products
+    description: One row per stock code from non-cancelled sales.
+    columns:
+      - name: stock_code
+        description: Product code.
+        tests: [unique, not_null]

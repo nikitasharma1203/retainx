@@ -1,0 +1,12 @@
+retainx:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('PGHOST', 'localhost') }}"
+      port: "{{ env_var('PGPORT', '5434') | as_number }}"
+      user: "{{ env_var('POSTGRES_USER', 'retainx') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', 'retainx') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'retainx') }}"
+      schema: analytics
+      threads: 4

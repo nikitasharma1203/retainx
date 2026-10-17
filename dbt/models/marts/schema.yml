@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: fct_orders
+    description: One row per customer per invoice, valid sales only (see docs/decisions.md for the filters).
+    columns:
+      - name: invoice_id
+        description: Invoice number. Unique per customer order.
+        tests: [unique, not_null]
+      - name: customer_id
+        description: Customer identifier. Rows without one are excluded upstream.
+        tests: [not_null]
+      - name: invoice_ts
+        description: Timestamp of the invoice.
+        tests: [not_null]
+      - name: order_revenue
+        description: Sum of quantity x unit price over the invoice lines, in GBP.
+        tests: [not_null]
+
+  - name: dim_customer
+    description: One row per customer with time-invariant attributes only.
+    columns:
+      - name: customer_id
+        description: Customer identifier.
+        tests: [unique, not_null]
+      - name: first_order_ts
+        description: Timestamp of the customer's first valid order.
+      - name: country
+        description: Country on the customer's most recent order.
+
+  - name: dim_product
+    description: One row per sellable product (stock codes starting with five digits).
+    columns:
+      - name: stock_code
+        description: Product code.
+        tests: [unique, not_null]
+      - name: first_sale_ts
+        description: First valid sale. Used to treat recent products as "new launches" in ranking tests.
+
+  - name: fct_product_customer
+    description: One row per (product, customer) with the number of separate invoices. Basis for repeat-purchase rate.
+    columns:
+      - name: stock_code
+        description: Product code.
+        tests: [not_null]
+      - name: customer_id
+        description: Customer identifier.
+        tests: [not_null]
+
+  - name: customer_rfm
+    description: Recency, frequency and monetary value as of the cutoff_date variable. Uses only data before the cutoff.
+    columns:
+      - name: customer_id
+        description: Customer identifier.
+        tests: [unique, not_null]
+      - name: recency_days
+        description: Days between the cutoff and the customer's last order before it.
+      - name: frequency
+        description: Number of distinct invoices before the cutoff.
+      - name: monetary
+        description: Total revenue before the cutoff, in GBP.

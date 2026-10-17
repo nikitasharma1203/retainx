@@ -1,0 +1,21 @@
+name: retainx
+version: "0.1.0"
+config-version: 2
+profile: retainx
+
+model-paths: ["models"]
+test-paths: ["tests"]
+
+vars:
+  # Features must only use data before this date. Override per run:
+  #   dbt build --vars '{cutoff_date: "2011-03-01"}'
+  cutoff_date: "2010-12-01"
+
+models:
+  retainx:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      +materialized: table

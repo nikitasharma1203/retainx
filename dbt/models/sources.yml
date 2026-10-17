@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: Untouched copy of the Online Retail II file, loaded by scripts/load_raw.py.
+    tables:
+      - name: online_retail
+        description: One row per invoice line.
