@@ -9,7 +9,7 @@ Customer intelligence layer for a D2C-style retailer: churn, propensity, CLV, a 
 score, behavioural personas, a product ranking that resists small samples, and a semantic layer an
 AI agent can query without raw SQL access.
 
-> Portfolio project on public data (UCI Online Retail II, CC BY 4.0). No live client, no A/B test.
+> Public data (UCI Online Retail II, CC BY 4.0). No live client, no A/B test.
 > Problem statement and success metrics: [`docs/problem_statement.md`](docs/problem_statement.md).
 
 ## Status
