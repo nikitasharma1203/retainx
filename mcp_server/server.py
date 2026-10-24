@@ -20,6 +20,7 @@ from mcp.server.fastmcp import FastMCP
 from sqlalchemy import create_engine, text
 
 from src import config, ranking
+from src.semantic import SemanticLayer
 
 MAX_ROWS = 50
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,7 @@ SCHEMA_FILES = [ROOT / "dbt/models/marts/schema.yml"]
 
 engine = create_engine(os.getenv("DATABASE_URL", config.DB_URL))
 mcp = FastMCP("retainx")
+semantic = SemanticLayer()
 
 
 def _clean(v):
@@ -48,6 +50,20 @@ def _date(s: str) -> dt.date:
         return dt.date.fromisoformat(s)
     except ValueError as e:
         raise ValueError(f"Dates must be YYYY-MM-DD, got {s!r}") from e
+
+
+@mcp.tool()
+def list_metrics() -> list[dict]:
+    """Governed business metrics (revenue, orders, active_customers, avg_order_value, customers), what they mean,
+    and how each can be grouped. Always use these definitions rather than raw tables."""
+    return semantic.list_metrics()
+
+
+@mcp.tool()
+def query_metric(metric: str, group_by: str | None = None, start: str | None = None, end: str | None = None) -> list[dict]:
+    """Compute a governed metric. group_by: day, week, month, quarter, year or a dimension such as country.
+    start (inclusive) and end (exclusive) are YYYY-MM-DD dates. Call list_metrics first."""
+    return semantic.query(engine, metric, group_by, start, end)
 
 
 @mcp.tool()
@@ -109,7 +125,7 @@ def top_products(as_of: str, n: int = 10, method: str = "wilson") -> list[dict]:
     if method not in {"wilson", "bayes", "naive"}:
         raise ValueError("method must be wilson, bayes or naive")
     n = max(1, min(int(n), MAX_ROWS))
-    pc = pd.read_sql(f"select * from {config.PRODUCT_CUSTOMER_TABLE}", engine, parse_dates=["first_purchase_ts"])
+    pc = pd.read_sql(f"select * from {config.PRODUCT_CUSTOMER_TABLE}", engine, parse_dates=["first_purchase_ts", "second_purchase_ts"])
     pr = pd.read_sql(f"select stock_code, description, first_sale_ts from {config.PRODUCT_TABLE}", engine,
                      parse_dates=["first_sale_ts"])
     st = ranking.product_stats(pc, pr, _date(as_of)).join(pr.set_index("stock_code")["description"])

@@ -1,0 +1,21 @@
+id,category,type,question,key
+1,metric,number,"What was total revenue for orders placed from 2010-01-01 to 2010-12-31 inclusive, in GBP?",8218623.82
+2,metric,number,"What was total revenue for orders placed from 2011-01-01 to 2011-11-30 inclusive, in GBP?",7659800.00
+3,metric,number,How many orders were placed from 2010-01-01 to 2010-12-31 inclusive?,18089
+4,metric,number,How many distinct customers placed at least one order from 2011-01-01 to 2011-11-30 inclusive?,4168
+5,metric,number,"What was the average order value from 2011-01-01 to 2011-11-30 inclusive, in GBP?",471.90
+6,metric,month,Which calendar month from 2011-01 to 2011-11 had the highest revenue? Answer as YYYY-MM.,2011-11
+7,metric,number,"What was revenue from customers whose country is United Kingdom, for orders from 2011-01-01 to 2011-11-30 inclusive, in GBP?",6277356.69
+8,metric,number,How many customers placed their first-ever order from 2011-01-01 to 2011-11-30 inclusive?,1509
+9,metric,text,Which country has the most customers?,United Kingdom
+10,metric,number,How many orders were placed from 2010-12-01 to 2010-12-31 inclusive?,1394
+11,metric,number,"What was total revenue for orders placed from 2010-10-01 to 2010-12-31 inclusive, in GBP?",2732734.70
+12,metric,number,How many distinct customers placed at least one order from 2010-01-01 to 2010-12-31 inclusive?,4205
+13,lookup,number,How many orders did customer 12347 place before 2011-01-01?,2
+14,lookup,number,"How much revenue did customer 12347 generate from orders placed before 2011-01-01, in GBP?",1323.32
+15,lookup,text,What is the country of customer 12347?,Iceland
+16,out_of_scope,number,"How many customers have placed exactly one order, ever?",1618
+17,out_of_scope,text,Which product (stock code) has been bought by the most distinct customers?,85123A
+18,out_of_scope,number,"As of 2010-12-01, how many customers had gone more than 180 days since their last order?",774
+19,out_of_scope,number,How many products have been bought by exactly one customer?,131
+20,out_of_scope,number,"What is the median order value, in GBP?",302.55

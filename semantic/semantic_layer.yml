@@ -1,0 +1,94 @@
+# Governed business definitions, in dbt MetricFlow style.
+# Kept outside dbt/models so a dbt version difference cannot break `dbt build`.
+# src/semantic.py compiles queries from this file for the MCP server.
+# To try it with dbt itself, copy it into dbt/models/ and run `dbt parse`.
+semantic_models:
+  - name: orders
+    description: >
+      One row per valid customer order. Valid means: not a cancellation, has a customer ID,
+      positive quantity and price, a product stock code (not postage or fees), and exact duplicate lines removed.
+    model: ref('fct_orders')
+    defaults:
+      agg_time_dimension: order_date
+    entities:
+      - name: order
+        type: primary
+        expr: invoice_id
+      - name: customer
+        type: foreign
+        expr: customer_id
+    dimensions:
+      - name: order_date
+        type: time
+        type_params:
+          time_granularity: day
+    measures:
+      - name: order_revenue
+        description: Sum of quantity x unit price over the order's lines, in GBP.
+        agg: sum
+        expr: order_revenue
+      - name: order_count
+        description: Number of valid orders (invoices).
+        agg: count
+        expr: invoice_id
+      - name: ordering_customers
+        description: Distinct customers with at least one valid order.
+        agg: count_distinct
+        expr: customer_id
+
+  - name: customers
+    description: One row per customer who has at least one valid order.
+    model: ref('dim_customer')
+    defaults:
+      agg_time_dimension: first_order_date
+    entities:
+      - name: customer
+        type: primary
+        expr: customer_id
+    dimensions:
+      - name: first_order_date
+        type: time
+        expr: first_order_ts
+        type_params:
+          time_granularity: day
+      - name: country
+        type: categorical
+        description: Country on the customer's most recent order.
+    measures:
+      - name: customer_count
+        description: Distinct customers.
+        agg: count_distinct
+        expr: customer_id
+
+metrics:
+  - name: revenue
+    label: Revenue
+    description: Total revenue from valid orders, in GBP.
+    type: simple
+    type_params:
+      measure: order_revenue
+  - name: orders
+    label: Orders
+    description: Number of valid orders.
+    type: simple
+    type_params:
+      measure: order_count
+  - name: active_customers
+    label: Active customers
+    description: Distinct customers who placed at least one valid order in the period.
+    type: simple
+    type_params:
+      measure: ordering_customers
+  - name: avg_order_value
+    label: Average order value
+    description: Revenue divided by valid orders, in GBP.
+    type: ratio
+    type_params:
+      numerator: revenue
+      denominator: orders
+  - name: customers
+    label: Customers
+    description: Distinct customers. The date filter and time grouping apply to the customer's FIRST order date.
+    type: simple
+    type_params:
+      measure: customer_count

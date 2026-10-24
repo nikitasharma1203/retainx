@@ -13,6 +13,9 @@ models:
       - name: is_missing_customer
         description: True when the line has no customer identifier.
         tests: [not_null]
+      - name: is_duplicate_line
+        description: True for the second and later copies of a line identical in every field.
+        tests: [not_null]
   - name: stg_products
     description: One row per stock code from non-cancelled sales.
     columns:

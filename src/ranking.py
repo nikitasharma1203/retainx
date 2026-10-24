@@ -29,11 +29,18 @@ def bayesian_rate(successes, n, prior_mean: float, prior_strength: float = 20.0)
 
 
 def product_stats(pc: pd.DataFrame, products: pd.DataFrame, cutoff) -> pd.DataFrame:
-    """pc: stock_code, customer_id, n_invoices, first_purchase_ts. products: stock_code, first_sale_ts."""
+    """Per-product stats as of `cutoff`, using only information available before it.
+
+    pc: stock_code, customer_id, first_purchase_ts, second_purchase_ts (NaT if bought once).
+    products: stock_code, first_sale_ts.
+    A buyer counts as a repeater only if their SECOND purchase happened before the cutoff.
+    """
     cutoff = pd.Timestamp(cutoff)
-    pc = pc[pc["first_purchase_ts"] < cutoff]
-    st = pc.groupby("stock_code").agg(n_customers=("customer_id", "nunique"),
-                                      n_repeaters=("n_invoices", lambda s: int((s >= 2).sum())))
+    seen = pc[pc["first_purchase_ts"] < cutoff].copy()
+    seen["is_repeater"] = seen["second_purchase_ts"] < cutoff   # NaT compares False
+    st = seen.groupby("stock_code").agg(n_customers=("customer_id", "nunique"),
+                                        n_repeaters=("is_repeater", "sum"))
+    st["n_repeaters"] = st["n_repeaters"].astype(int)
     st = st.join(products.set_index("stock_code")["first_sale_ts"])
     st["is_new"] = st["first_sale_ts"] >= cutoff - pd.Timedelta(days=30)
     prior = st["n_repeaters"].sum() / max(st["n_customers"].sum(), 1)

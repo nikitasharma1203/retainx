@@ -1,0 +1,10 @@
+version: 2
+models:
+  - name: metricflow_time_spine
+    description: Calendar days, required by the dbt semantic layer.
+    time_spine:
+      standard_granularity_column: date_day
+    columns:
+      - name: date_day
+        description: The day.
+        granularity: day

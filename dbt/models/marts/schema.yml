@@ -38,7 +38,7 @@ models:
         description: First valid sale. Used to treat recent products as "new launches" in ranking tests.
 
   - name: fct_product_customer
-    description: One row per (product, customer) with the number of separate invoices. Basis for repeat-purchase rate.
+    description: One row per (product, customer) with first and second purchase timestamps. Basis for repeat-purchase rate as of a date.
     columns:
       - name: stock_code
         description: Product code.
@@ -46,6 +46,10 @@ models:
       - name: customer_id
         description: Customer identifier.
         tests: [not_null]
+      - name: first_purchase_ts
+        description: Timestamp of the customer's first invoice containing this product.
+      - name: second_purchase_ts
+        description: Timestamp of the customer's second distinct invoice with this product. Null if they bought it once. A repeat buyer as of a date means this is before that date.
 
   - name: customer_rfm
     description: Recency, frequency and monetary value as of the cutoff_date variable. Uses only data before the cutoff.

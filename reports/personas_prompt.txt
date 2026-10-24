@@ -1,0 +1,10 @@
+Below are behavioural segments of retail customers (medians per segment).
+Write one persona card per segment: a short name, who they are, how they behave, what they need, and one recommended action for a CRM manager. Use ONLY these numbers. Do not invent demographics, ages or motives; the data has none. Flag any segment too small to act on.
+
+         customers  recency_days  orders  total_spend  avg_order_value  tenure_days  share_customers  share_revenue   placeholder_label
+persona                                                                                                                                
+0             1527          56.0     5.0      1408.09           252.92        579.0             0.26           0.14  High spend, recent
+1             1376          45.0     2.0       461.67           268.33        120.0             0.24           0.06   Low spend, recent
+2              993         423.0     2.0       661.39           347.54        580.0             0.17           0.06  Low spend, lapsing
+3              908         425.0     1.0       167.30           130.90        505.5             0.16           0.01  Low spend, lapsing
+4             1020          21.0    14.0      5767.10           439.17        682.0             0.18           0.74  High spend, recent

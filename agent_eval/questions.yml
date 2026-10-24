@@ -1,0 +1,45 @@
+# 20 fixed questions. Answers are computed from the governed definitions (valid orders only: no cancellations,
+# no missing customer IDs, no non-product codes, no exact duplicates), so the answer key comes from the marts.
+# Do NOT tell the agent these definitions in the raw condition. Whether it finds them is part of the test.
+# category: metric = a governed metric answers it; lookup = one customer; out_of_scope = the metric tools cannot answer it.
+questions:
+  - {id: 1, category: metric, type: number, question: "What was total revenue for orders placed from 2010-01-01 to 2010-12-31 inclusive, in GBP?",
+     sql: "select round(sum(order_revenue)::numeric,2) from analytics.fct_orders where invoice_ts >= '2010-01-01' and invoice_ts < '2011-01-01'"}
+  - {id: 2, category: metric, type: number, question: "What was total revenue for orders placed from 2011-01-01 to 2011-11-30 inclusive, in GBP?",
+     sql: "select round(sum(order_revenue)::numeric,2) from analytics.fct_orders where invoice_ts >= '2011-01-01' and invoice_ts < '2011-12-01'"}
+  - {id: 3, category: metric, type: number, question: "How many orders were placed from 2010-01-01 to 2010-12-31 inclusive?",
+     sql: "select count(*) from analytics.fct_orders where invoice_ts >= '2010-01-01' and invoice_ts < '2011-01-01'"}
+  - {id: 4, category: metric, type: number, question: "How many distinct customers placed at least one order from 2011-01-01 to 2011-11-30 inclusive?",
+     sql: "select count(distinct customer_id) from analytics.fct_orders where invoice_ts >= '2011-01-01' and invoice_ts < '2011-12-01'"}
+  - {id: 5, category: metric, type: number, question: "What was the average order value from 2011-01-01 to 2011-11-30 inclusive, in GBP?",
+     sql: "select round(avg(order_revenue)::numeric,2) from analytics.fct_orders where invoice_ts >= '2011-01-01' and invoice_ts < '2011-12-01'"}
+  - {id: 6, category: metric, type: month, question: "Which calendar month from 2011-01 to 2011-11 had the highest revenue? Answer as YYYY-MM.",
+     sql: "select to_char(date_trunc('month', invoice_ts), 'YYYY-MM') from analytics.fct_orders where invoice_ts >= '2011-01-01' and invoice_ts < '2011-12-01' group by 1 order by sum(order_revenue) desc limit 1"}
+  - {id: 7, category: metric, type: number, question: "What was revenue from customers whose country is United Kingdom, for orders from 2011-01-01 to 2011-11-30 inclusive, in GBP?",
+     sql: "select round(sum(o.order_revenue)::numeric,2) from analytics.fct_orders o join analytics.dim_customer c using (customer_id) where c.country = 'United Kingdom' and o.invoice_ts >= '2011-01-01' and o.invoice_ts < '2011-12-01'"}
+  - {id: 8, category: metric, type: number, question: "How many customers placed their first-ever order from 2011-01-01 to 2011-11-30 inclusive?",
+     sql: "select count(*) from analytics.dim_customer where first_order_ts >= '2011-01-01' and first_order_ts < '2011-12-01'"}
+  - {id: 9, category: metric, type: text, question: "Which country has the most customers?",
+     sql: "select country from analytics.dim_customer group by 1 order by count(*) desc limit 1"}
+  - {id: 10, category: metric, type: number, question: "How many orders were placed from 2010-12-01 to 2010-12-31 inclusive?",
+     sql: "select count(*) from analytics.fct_orders where invoice_ts >= '2010-12-01' and invoice_ts < '2011-01-01'"}
+  - {id: 11, category: metric, type: number, question: "What was total revenue for orders placed from 2010-10-01 to 2010-12-31 inclusive, in GBP?",
+     sql: "select round(sum(order_revenue)::numeric,2) from analytics.fct_orders where invoice_ts >= '2010-10-01' and invoice_ts < '2011-01-01'"}
+  - {id: 12, category: metric, type: number, question: "How many distinct customers placed at least one order from 2010-01-01 to 2010-12-31 inclusive?",
+     sql: "select count(distinct customer_id) from analytics.fct_orders where invoice_ts >= '2010-01-01' and invoice_ts < '2011-01-01'"}
+  - {id: 13, category: lookup, type: number, question: "How many orders did customer 12347 place before 2011-01-01?",
+     sql: "select count(*) from analytics.fct_orders where customer_id = 12347 and invoice_ts < '2011-01-01'"}
+  - {id: 14, category: lookup, type: number, question: "How much revenue did customer 12347 generate from orders placed before 2011-01-01, in GBP?",
+     sql: "select round(sum(order_revenue)::numeric,2) from analytics.fct_orders where customer_id = 12347 and invoice_ts < '2011-01-01'"}
+  - {id: 15, category: lookup, type: text, question: "What is the country of customer 12347?",
+     sql: "select country from analytics.dim_customer where customer_id = 12347"}
+  - {id: 16, category: out_of_scope, type: number, question: "How many customers have placed exactly one order, ever?",
+     sql: "select count(*) from (select customer_id from analytics.fct_orders group by 1 having count(*) = 1) t"}
+  - {id: 17, category: out_of_scope, type: text, question: "Which product (stock code) has been bought by the most distinct customers?",
+     sql: "select stock_code from analytics.fct_product_customer group by 1 order by count(*) desc limit 1"}
+  - {id: 18, category: out_of_scope, type: number, question: "As of 2010-12-01, how many customers had gone more than 180 days since their last order?",
+     sql: "select count(*) from analytics.customer_rfm where recency_days > 180"}
+  - {id: 19, category: out_of_scope, type: number, question: "How many products have been bought by exactly one customer?",
+     sql: "select count(*) from (select stock_code from analytics.fct_product_customer group by 1 having count(*) = 1) t"}
+  - {id: 20, category: out_of_scope, type: number, question: "What is the median order value, in GBP?",
+     sql: "select round(percentile_cont(0.5) within group (order by order_revenue)::numeric,2) from analytics.fct_orders"}
