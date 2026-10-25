@@ -12,6 +12,15 @@ AI agent can query without raw SQL access.
 > Public data (UCI Online Retail II, CC BY 4.0). No live client, no A/B test.
 > Problem statement and success metrics: [`docs/problem_statement.md`](docs/problem_statement.md).
 
+## Key findings
+
+1. **Revenue is concentrated.** The top 18% of customers generate 74% of revenue; the top 44% generate 88%.
+2. **The churn features carry real signal, and the simple model is enough.** Every trained model beats a recency-only rule by about 0.09 AUC (0.75 vs 0.66), and logistic regression matches XGBoost.
+3. **The health score separates risk on held-out data.** Red-band customers churned 3.1 times as often as Green (75% vs 24%).
+4. **Evidence-aware ranking picks better products.** Out of sample, buyers of the Wilson or Bayesian top 20 repeat at 2.3 times the all-product rate (12.0% vs 5.2%), against 1.5 times for a naive ranking (7.6%).
+5. **CLV ranks customers but its level follows the calendar.** Correlation with actual purchases is 0.74 to 0.82; predicted / actual ranges from 0.85 to 1.65. It is used for ranking only.
+6. **This dataset cannot identify price elasticity.** The estimates run from -3.4 to +0.2, and the price structure alone reproduces a line-level "elasticity" of -3.4.
+
 ## Status
 
 | Piece | State |
@@ -21,9 +30,9 @@ AI agent can query without raw SQL access.
 | CLV | Ranks customers well. Its level follows the calendar, so it is used for ranking only |
 | Demand baselines | Done. Product-week demand is very lumpy; totals are forecastable |
 | Pricing (elasticity) | Run on the real data. The estimates cannot be told apart from a pricing-structure artifact, so the data does not identify elasticity. Reported as a limits case |
-| Semantic layer and MCP tools | Built. Tested on synthetic data and over stdio. Not yet run on the real data |
-| Agent evaluation | Harness built, answer key generated (20 of 20 reference answers found), roles created. The evaluation runs themselves are pending |
-| Notebook | Written; its code runs on synthetic data. Outputs are not embedded until you run it on the real data |
+| Semantic layer and MCP tools | Built. A test checks that the compiled metrics match direct SQL on the real database. MCP servers tested over stdio. No agent has used them yet |
+| Agent evaluation | Harness built, answer key generated (20 of 20 reference answers found), database roles created. **Not run**, so no scores exist and nothing is claimed about the comparison |
+| Notebook | Written; code tested on synthetic data. Outputs not embedded yet |
 
 ## The problem
 
@@ -92,7 +101,7 @@ flowchart TD
     subgraph Agent["4. Governed analytics for AI agents"]
         MARTS --> SEM["Semantic definitions<br/>compiled metric queries"]
         SEM --> MCP["MCP server<br/>governed tools + read-only SQL baselines"]
-        MCP --> EVAL["Agent evaluation harness<br/>20 questions · runs pending"]
+        MCP --> EVAL["Agent evaluation harness<br/>20 questions · not run"]
     end
 ```
 
@@ -248,18 +257,6 @@ Silhouette is 0.338 at k = 3 and 0.272 at k = 5, so the structure is moderate. k
 The headline: the top two groups (44% of customers) generate 88% of revenue; the two lapsed groups (33%) generate 7%.
 Cards with suggested actions: [`docs/personas.md`](docs/personas.md).
 
-## Semantic layer and agent evaluation
-
-*Built; real run pending.* The question: does a governed semantic layer make an AI agent more accurate on a messy database than raw SQL access, and what does it cost in flexibility?
-
-- **Governed definitions** live in [`semantic/semantic_layer.yml`](semantic/semantic_layer.yml) in dbt MetricFlow style: five metrics (revenue, orders, active customers, average order value, customers), time grouping, and country through the customer entity. `src/semantic.py` compiles queries from it. It is a minimal compiler, not MetricFlow.
-- **dbt compatibility:** dbt 1.12.5 accepts the YAML once a time-spine model is added (`semantic/dbt_metricflow/`), and the full build passes. The files sit outside `dbt/models` so a dbt version difference cannot break the build. Not tested on dbt 1.13 beta.
-- **Running it:** `python agent_eval/make_desktop_configs.py` writes Claude Desktop configs for each condition with your own paths. A headless Claude Code runner exists but is experimental and needs the `claude` CLI.
-- **Three conditions** ([protocol](agent_eval/PROTOCOL.md)): `raw` (every table, no definitions), `documented` (marts only, column meanings), `metrics` (governed tools).
-- **Enforced by the database, not by the prompt:** read-only roles `agent_raw` and `agent_marts`; the documented and metrics conditions cannot read the raw schema.
-- **20 questions:** 12 answered by governed metrics, 3 single-customer lookups, 5 the metric tools cannot answer. For those 5 the right behaviour in `metrics` is to decline.
-- **Expected trade-off, to be measured:** `raw` gives plausible but wrong figures (cancellations, postage, missing customers and duplicates counted); `metrics` gives governed answers but declines what is not defined.
-
 ## Pricing and demand
 
 `python -m src.pricing`, run on the real data (4,619 products, 172,340 product-weeks).
@@ -283,13 +280,23 @@ Cards with suggested actions: [`docs/personas.md`](docs/personas.md).
 | 10 | -0.99 | 100 |
 | 20 | +0.17 (interval -0.89 to 1.23) | 22 |
 
-**Price-quantity link.** Within the same product and week, ln(price) on ln(quantity) has a slope of -0.029 (se 0.001, 720,769 lines, 4,098 products): a line 10% bigger sells about 0.3% cheaper. Volume discounts exist but look small.
+**The price-quantity link, measured within the same product and week** (720,769 lines, 4,098 products):
 
-**A simulation shows why small can still matter.** In a simulated world where demand ignores price (true elasticity 0) but bigger lines are 0.03 cheaper per log unit, the estimator returns -1.9 to -3.0 on median price and -3.8 on mean price when prices vary by about 10% within a week. That is the same range as the real estimates. With tighter prices the artifact is far larger. The 10% spread is my assumption; the command now prints the real spread and the line-level "elasticity" that the price structure alone produces, to compare with the estimates above.
+| Measure | Value |
+|---|---|
+| ln(price) on ln(quantity): do bigger lines get lower prices? | -0.029 (se 0.001) |
+| Spread within product-week: sd of ln(price), sd of ln(quantity) | 0.086, 0.939 |
+| ln(quantity) on ln(price) at line level: the "elasticity" the price structure produces | -3.40 (se 0.10) |
+| Weekly estimate, median price (above) | -1.26 |
+| Weekly estimate, mean price (above) | -3.44 |
+
+**A simulation as a cross-check.** In a simulated world where demand ignores price (true elasticity 0) but bigger lines are 0.03 cheaper per log unit, the estimator returns -1.9 to -3.0 on median price and -3.8 on mean price when prices vary by about 10% within a week. The measured spread in the real data is 8.6%, close to that assumption.
 
 **Reading.**
-- **The estimates are not stable.** They run from -1.80 to +0.17 as thin weeks are dropped, and from -1.26 to -3.44 depending on how price is measured.
-- **They cannot be told apart from an artifact.** A pricing structure with a tiny quantity discount, and no true price response at all, produces estimates in the same range.
+- **Volume discounts are small but are enough.** A slope of -0.029 at this price spread produces a line-level "elasticity" of about -3.4 on its own (-0.029 x 0.939² / 0.086² is about -3.5).
+- **The weekly estimates are in the same range.** The mean-price estimate (-3.44) matches the line-level figure almost exactly; the median-price estimate (-1.26) is smaller but still inside the range the artifact produces. They cannot be read as demand response.
+- **The estimates are also unstable:** -1.80 to +0.17 as thin weeks are dropped.
+- **Caveat:** line-level data cannot separate "price drives quantity" from "quantity drives price". The measured discount shows the second exists and is sufficient to produce estimates of this size. It does not prove there is no demand response.
 - **The revenue scenarios are not credible.** The -1.26 estimate implies that a 10% price cut raises revenue by 2.7%. Do not use it.
 - **Conclusion:** this dataset cannot identify price elasticity. The module demonstrates the method and its limits. A credible answer needs a controlled price test.
 
@@ -303,6 +310,19 @@ Cards with suggested actions: [`docs/personas.md`](docs/personas.md).
 | Average of the last two | 0.78 | -0.07 | 0.33 |
 
 Product-week demand is very lumpy: the best baseline misses 70% of volume. Summed over the 50 products the error drops to 30%, so forecast at the aggregate level. The seasonal baseline is the worst at both levels, with only one prior year of history.
+
+## Semantic layer and agent evaluation
+
+*Harness built; the evaluation has not been run.* The question it is designed to answer: does a governed semantic layer make an AI agent more accurate on a messy database than raw SQL access, and what does it cost in flexibility?
+
+- **Governed definitions** live in [`semantic/semantic_layer.yml`](semantic/semantic_layer.yml) in dbt MetricFlow style: five metrics (revenue, orders, active customers, average order value, customers), time grouping, and country through the customer entity. `src/semantic.py` compiles queries from it. It is a minimal compiler, not MetricFlow.
+- **dbt compatibility:** dbt 1.12.5 accepts the YAML once a time-spine model is added (`semantic/dbt_metricflow/`), and the full build passes. The files sit outside `dbt/models` so a dbt version difference cannot break the build. Not tested on dbt 1.13 beta.
+- **Verified:** a test checks that the compiled metrics (revenue, active customers, average order value, revenue by country) match direct SQL on the real database. The MCP servers were tested over stdio. The reference answer key was generated for all 20 questions.
+- **Not done:** no agent has been run against the three conditions, so there are no scores. The hypothesis behind the design is untested: that raw SQL access gives plausible but wrong figures (cancellations, postage, missing customers and duplicates counted), while governed metrics give correct answers but decline what is not defined.
+- **Three conditions** ([protocol](agent_eval/PROTOCOL.md)): `raw` (every table, no definitions), `documented` (marts only, column meanings), `metrics` (governed tools).
+- **Enforced by the database, not by the prompt:** read-only roles `agent_raw` and `agent_marts`; the documented and metrics conditions cannot read the raw schema.
+- **20 questions:** 12 answered by governed metrics, 3 single-customer lookups, 5 the metric tools cannot answer. For those 5 the right behaviour in `metrics` is to decline.
+- **To run it (optional):** `python agent_eval/make_desktop_configs.py` writes Claude Desktop configs for each condition using this machine's paths. A headless Claude Code runner exists but is experimental, needs the `claude` CLI, and has not been tested against it.
 
 ## Reproduce
 
@@ -344,14 +364,19 @@ python -m src.eval.ranking_check
 python -m src.pricing
 ```
 
-Agent evaluation (see `agent_eval/PROTOCOL.md`):
+Agent evaluation (optional; see `agent_eval/PROTOCOL.md`; not run for the results above):
 ```
 python scripts/create_agent_roles.py              # rerun after every dbt build
 python agent_eval/make_key.py
 python agent_eval/score.py
 ```
 
-Notebook: `pip install -r requirements-notebooks.txt`, then `jupyter lab` from the repo root and open `notebooks/walkthrough.ipynb`.
+Notebook (not yet executed on the real data). Use `python -m jupyter` so the virtual environment's copy runs, not a global one:
+```
+pip install -r requirements-notebooks.txt
+python -m jupyter lab                             # open notebooks/walkthrough.ipynb
+python -m jupyter nbconvert --to notebook --execute notebooks/walkthrough.ipynb --inplace
+```
 
 Dedupe sensitivity (rebuild without dropping duplicates, rerun a model, then rebuild with the default):
 ```
@@ -373,6 +398,7 @@ MCP server (from the repo root): `python -m mcp_server.server`. Pinned `mcp<2`, 
 | Ranking signal | Repeat-purchase rate, judged as of each cutoff | The dataset has no ratings. A buyer counts as a repeater only if the second purchase is before the cutoff |
 | CLV | BG/NBD, falling back to Pareto/NBD, used for ranking only | BG/NBD's formula is invalid when it fits a <= 1; on this data it degenerated. The level of Pareto/NBD follows the calendar |
 | Personas | K-Means, k chosen by silhouette | Moderate structure only. A larger k can be forced for finer segments |
+| Pricing | Report the estimate with its sensitivity and the artifact test, not a recommendation | The data cannot identify elasticity |
 | Agent access | Governed metric tools and read-only database roles | The agent cannot pick the wrong redundant table or write anything, and the database enforces it |
 | Semantic layer | YAML in MetricFlow style, compiled by a small Python module, kept outside `dbt/models` | Gives the agent one definition of each metric without risking the dbt build |
 
@@ -384,19 +410,19 @@ MCP server (from the repo root): `python -m mcp_server.server`. Pinned `mcp<2`, 
 - CLV totals are unreliable: the level follows the calendar (0.85 to 1.65 across calibration dates) and a fixed correction does not carry over. Use CLV to rank customers.
 - The health score covers active customers only. At 2011-06-01, 45% of customers with a past order were already lapsed.
 - Personas describe behaviour only. The dataset has no demographics.
+- This dataset cannot identify price elasticity credibly: the estimates range from -3.4 to +0.2, and the price structure alone produces a line-level figure of -3.4.
 - The semantic layer is a minimal compiler (simple and ratio metrics, one join, date filter only), not MetricFlow.
-- The agent evaluation is small (20 questions), uses one model, and agent answers vary between runs.
-- This dataset cannot identify price elasticity credibly: the estimates range from -3.4 to +0.2, and a simulation with zero true elasticity produces estimates in the same range.
-- Pricing elasticity from observed prices would be biased. The pricing module is not built.
+- The agent evaluation harness has not been run, so the semantic layer's benefit for agents is unmeasured.
 - No online evaluation. All metrics are offline backtests.
 - `lifetimes` is old. If it fails to install, swap in `pymc-marketing`. It counts at most one purchase per time unit, so same-day invoices collapse.
 
-## Next
+## Open items
 
-1. Run the agent evaluation (3 conditions x 20 questions) and add the scores.
-2. Run the pricing command again for the line-level price-quantity measurement, and add it above.
-3. Run the notebook on the real data so the charts are embedded (`jupyter nbconvert --to notebook --execute notebooks/walkthrough.ipynb --inplace`), then commit it.
-4. Push to GitHub; CI runs the unit tests and `dbt parse` on every push.
+1. Run the notebook on the real data so the charts are embedded, then commit it.
+2. Compare propensity against baselines (a recency rule and logistic regression), as was done for churn.
+3. A controlled price test would be the credible way to estimate elasticity; this dataset cannot provide one.
+4. Three or more years of history would allow a seasonal CLV model and a testable same-season correction.
+5. Optional: run the agent evaluation; the harness, key and roles are ready.
 
 ## Repository layout
 
