@@ -67,6 +67,7 @@ def test_volume_discount_slope_is_recovered():
                              "quantity": q, "unit_price": float(np.exp(1 - 0.1 * np.log(q) + rng.normal(0, 0.05)))})
     out = pr.volume_discount_slope(pd.DataFrame(rows))
     assert out["slope"] == pytest.approx(-0.1, abs=0.02) and out["se"] > 0
+    assert out["reverse_slope"] < 0 and out["sd_ln_quantity_within"] > out["sd_ln_price_within"]
 
 
 def test_aggregating_products_makes_demand_easier_to_forecast():
@@ -77,3 +78,26 @@ def test_aggregating_products_makes_demand_easier_to_forecast():
     per_product = pr.backtest_baselines(Y).set_index("model")["wape"]["4-week average"]
     total = pr.backtest_baselines(Y.sum(axis=1).to_frame("total")).set_index("model")["wape"]["4-week average"]
     assert total < per_product
+
+
+def _fake_elasticity_world(link=-0.03, price_noise=0.10, P=150, W=60, seed=0):
+    """Demand does NOT depend on price (true elasticity 0); bigger lines just get slightly lower unit prices."""
+    rng = np.random.default_rng(seed)
+    pop, base = rng.uniform(0.3, 12, P), rng.normal(1.0, 0.5, P)
+    rows = []
+    for p in range(P):
+        for w in range(W):
+            n = 1 + rng.poisson(pop[p] * np.exp(rng.normal(0, 0.5)))
+            q = np.maximum(1, np.round(np.exp(rng.normal(2.0, 1.2, n))))
+            price = np.exp(base[p]) * q ** link * np.exp(rng.normal(0, price_noise, n))
+            rows.append({"stock_code": f"P{p}", "week": pd.Timestamp("2010-01-04") + pd.Timedelta(weeks=w),
+                         "units": q.sum(), "price_median": float(np.median(price)),
+                         "price_mean": float((price * q).sum() / q.sum()), "n_lines": n})
+    return pd.DataFrame(rows)
+
+
+def test_a_tiny_quantity_price_link_fakes_a_large_elasticity():
+    """The documented failure mode: with true elasticity 0, a -0.03 quantity-to-price link gives clearly negative estimates."""
+    d = _fake_elasticity_world()
+    assert pr.estimate_elasticity(d, min_lines=5)["elasticity"] < -1.0
+    assert pr.estimate_elasticity(d, price_col="price_mean", min_lines=5)["elasticity"] < -1.5

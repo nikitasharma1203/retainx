@@ -22,7 +22,9 @@ python agent_eval/make_key.py
 Read the warning it prints: if customer 12347 is missing, change the id in `questions.yml` (questions 13 to 15) and rerun.
 Question 18 reads `customer_rfm`, so build it at its default cutoff (2010-12-01).
 
-## Claude Desktop configuration (Windows paths; adjust to yours)
+## Claude Desktop configuration
+
+Generate configs with your own paths: `python agent_eval/make_desktop_configs.py` (with your venv active and `DATABASE_URL` set). It writes one file per condition into `agent_eval/desktop_configs/` and prints the copy commands. Back up your current Claude Desktop config first. The example below shows what the files contain.
 
 Add ONE of these servers at a time, and turn off every other tool and connector for the run, so tools cannot leak between conditions.
 

@@ -73,3 +73,13 @@ def test_runner_builds_a_restricted_command_and_config(tmp_path):
     assert "--strict-mcp-config" in cmd and cmd[cmd.index("--allowedTools") + 1] == "mcp__retainx-raw"
     assert "How many orders?" in cmd[2] and "ANSWER:" in cmd[2] and cmd[-2:] == ["--model", "some-model"]
     assert rc.parse_result(json.dumps({"result": " hi "})) == "hi"
+
+
+def test_desktop_configs_cover_every_condition(tmp_path):
+    import json
+    import make_desktop_configs as mdc
+    paths = mdc.write_configs(tmp_path, python="py", env={"PYTHONPATH": "x", "DATABASE_URL": "y"})
+    assert sorted(p.stem.split("_")[-1] for p in paths) == ["documented", "metrics", "raw"]
+    cfg = json.loads((tmp_path / "claude_desktop_config_raw.json").read_text())
+    server = cfg["mcpServers"]["retainx-raw"]
+    assert server["command"] == "py" and server["args"][-2:] == ["--mode", "raw"] and server["env"]["DATABASE_URL"] == "y"

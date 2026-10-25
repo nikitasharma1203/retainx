@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "retainx-documented": {
+      "command": "C:\\Users\\sniks\\retainx\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "mcp_server.sql_server",
+        "--mode",
+        "documented"
+      ],
+      "env": {
+        "PYTHONPATH": "C:\\Users\\sniks\\retainx",
+        "DATABASE_URL": "postgresql+psycopg2://retainx:retainx@127.0.0.1:5434/retainx"
+      }
+    }
+  }
+}

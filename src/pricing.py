@@ -82,25 +82,34 @@ def estimate_elasticity(panel: pd.DataFrame, price_col: str = "price_median", mi
 
 
 def volume_discount_slope(sales: pd.DataFrame, min_lines: int = 2) -> dict:
-    """Within the same product and week, do bigger lines get lower unit prices?
+    """Within the same product and week, how are line quantity and unit price linked?
 
-    Slope of ln(unit price) on ln(quantity), demeaned within product-week, clustered by product.
-    A clearly negative slope means volume discounts exist, so any price measure that weights by quantity
-    is mechanically linked to units sold, which would bias the elasticity toward more negative values.
+    Everything is demeaned within product-week and clustered by product.
+      slope          ln(price) on ln(quantity): do bigger lines get lower prices (volume discounts)?
+      reverse_slope  ln(quantity) on ln(price) at LINE level: the "elasticity" you would read off the same
+                     data even though price here is driven by quantity, not the other way round.
+    If reverse_slope is large and negative, a pricing structure alone can fake a large elasticity, and the
+    weekly estimates cannot be told apart from that artifact. A tiny slope is enough when prices barely vary.
     """
     d = sales[(sales["quantity"] > 0) & (sales["unit_price"] > 0)].copy()
     d["week"] = _week(d["invoice_ts"])
     d["lp"], d["lq"] = np.log(d["unit_price"]), np.log(d["quantity"])
-    grp = d.groupby(["stock_code", "week"])
-    d = d[grp["lp"].transform("size") >= min_lines]
+    d = d[d.groupby(["stock_code", "week"])["lp"].transform("size") >= min_lines]
     grp = d.groupby(["stock_code", "week"])
     lp_t = d["lp"] - grp["lp"].transform("mean")
     lq_t = d["lq"] - grp["lq"].transform("mean")
-    sxx = float((lq_t ** 2).sum())
-    beta = float((lq_t * lp_t).sum() / sxx)
-    scores = ((lq_t * (lp_t - beta * lq_t)).groupby(d["stock_code"]).sum())
-    G = len(scores)
-    return {"slope": beta, "se": float(np.sqrt(G / (G - 1) * (scores ** 2).sum()) / sxx),
+
+    def cluster_slope(x, y):
+        sxx = float((x ** 2).sum())
+        beta = float((x * y).sum() / sxx)
+        scores = (x * (y - beta * x)).groupby(d["stock_code"]).sum()
+        G = len(scores)
+        return beta, float(np.sqrt(G / (G - 1) * (scores ** 2).sum()) / sxx), G
+
+    beta, se, G = cluster_slope(lq_t, lp_t)
+    rbeta, rse, _ = cluster_slope(lp_t, lq_t)
+    return {"slope": beta, "se": se, "reverse_slope": rbeta, "reverse_se": rse,
+            "sd_ln_price_within": float(lp_t.std()), "sd_ln_quantity_within": float(lq_t.std()),
             "n_lines": int(len(d)), "n_products": int(G)}
 
 
@@ -171,9 +180,11 @@ if __name__ == "__main__":
     print(el.round(3).to_string(index=False))
 
     vd = volume_discount_slope(sales)
-    print(f"\nVolume-discount check (same product, same week): ln(price) on ln(quantity) slope = {vd['slope']:.3f} "
-          f"(se {vd['se']:.3f}, {vd['n_lines']:,} lines, {vd['n_products']:,} products). "
-          "Negative = bigger lines get lower prices, which mechanically links price to units.")
+    print(f"\nPrice-quantity link within the same product and week ({vd['n_lines']:,} lines, {vd['n_products']:,} products):")
+    print(f"  ln(price) on ln(quantity): {vd['slope']:.3f} (se {vd['se']:.3f})   negative = bigger lines get lower prices")
+    print(f"  spread within product-week: sd of ln(price) = {vd['sd_ln_price_within']:.3f}, sd of ln(quantity) = {vd['sd_ln_quantity_within']:.3f}")
+    print(f"  ln(quantity) on ln(price): {vd['reverse_slope']:.3f} (se {vd['reverse_se']:.3f})   "
+          "this 'elasticity' arises from the price structure alone; compare it with the estimates above")
 
     sens = pd.DataFrame([{"min_lines_per_product_week": m, **estimate_elasticity(panel, min_lines=m)} for m in (1, 5, 10, 20)])
     sens.to_csv("reports/pricing_sensitivity.csv", index=False)
